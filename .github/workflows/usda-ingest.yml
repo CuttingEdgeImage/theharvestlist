@@ -1,0 +1,42 @@
+name: USDA Seed Ingest (Farmers Markets)
+
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: "2-letter state abbreviation (example: MI)"
+        required: true
+        default: "MI"
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Dump USDA state dataset
+        env:
+          USDA_LFP_API_KEY: ${{ secrets.USDA_LFP_API_KEY }}
+        run: |
+          node scripts/usda_dump_state.mjs "${{ inputs.state }}"
+
+      - name: Commit dataset if changed
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add app/app/data/usda/markets/
+            git commit -m "USDA seed: farmers markets (${{ inputs.state }})"
+            git push
+          else
+            echo "No changes to commit."
+          fi
